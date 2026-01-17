@@ -1,0 +1,55 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:13
+    container_name: energyzero_postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  airflow-webserver:
+    build: .
+    container_name: energyzero_webserver
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+      - ./data:/opt/airflow/data
+      - ./requirements.txt:/requirements.txt
+    ports:
+      - "8080:8080"
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    command: >
+      bash -c "airflow db init &&
+      airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@example.com --password admin &&
+      airflow webserver"
+
+  airflow-scheduler:
+    build: .
+    container_name: energyzero_scheduler
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+      - ./data:/opt/airflow/data
+      - ./requirements.txt:/requirements.txt
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    command: scheduler
